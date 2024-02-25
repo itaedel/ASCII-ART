@@ -1,112 +1,157 @@
 package ascii_art.img_to_char;
 
 import image.Image;
+//import image.SubImage;
 
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 
-//TODO: this class
 
 /**
- *
+ * a class for matching the char with its brightness
  */
 public class BrightnessImgCharMatcher {
     private final Image image;
     private final String fontName;
     private static final int RES_NORMAL = 16;
     private static final int MAX_RGB = 255;
+    private HashMap<Integer, double[][]> subImagesMap; // key is the numCharsInRow
 
     /**
      * constructor
-     * @param img
-     * @param font
+     * @param img an image
+     * @param font the font of the chars
      */
     public BrightnessImgCharMatcher(Image img, String font){
         this.image = img;
         this.fontName = font;
+        this.subImagesMap = new HashMap<>();
     }
 
     /**
      * convert the whole image into chars
-     * @param numCharsInRow
-     * @param charSet
-     * @return
+     * @param numCharsInRow the number of chars in a row
+     * @param charSet the chars
+     * @return the image in characters
      */
     public char[][] chooseChars(int numCharsInRow, Character[] charSet){
-        int sub_picture_size = image.getWidth() / numCharsInRow; // assuming this is a whole number
-        int numCharsInCol = image.getHeight() / sub_picture_size; // assuming this is a whole number??
-        // image.getHeight() / sub_picture_size = amount of sub pictures in a column
-        char [][] final_picture = new char[numCharsInCol][numCharsInRow];
-        double [][] subImagesAvg = getAvgForImage(sub_picture_size, numCharsInRow, numCharsInCol);
-        HashMap<Character, Double> charBrightnessMap = new HashMap<Character, Double>();
-        CalcCharBrightness(charBrightnessMap, sub_picture_size, charSet); // does phase 1-3
-        for (int i = 0; i < numCharsInCol; i++) {
-            for (int j = 0; j < numCharsInRow; j++) {
-                char best_char = ' '; // todo change
-                double bestDiff = 2;
-                for(Character key: charBrightnessMap.keySet()){
-                    double curDiff = Math.abs(charBrightnessMap.get(key) - subImagesAvg[i][j]);
-                    if(curDiff < bestDiff){
-                        bestDiff = curDiff;
-                        best_char = key;
-                    }
-                }
-                final_picture[i][j] = best_char;
-            }
+        int subImageSize = image.getWidth() / numCharsInRow; // assuming this is a whole number
+        int numCharsInCol = image.getHeight() / subImageSize; // assuming this is a whole number
+        double [][] subImageAvg = null;
+        if(subImagesMap.containsKey(numCharsInRow)){
+            subImageAvg = subImagesMap.get(numCharsInRow);
+        } else{
+            subImageAvg = getImageAvg(subImageSize, numCharsInRow, numCharsInCol);
+            subImagesMap.put(numCharsInRow, subImageAvg);
         }
-        return final_picture;
+        HashMap<Character, Double> charBrightnessMap = new HashMap<>();
+        CalcCharBrightness(charBrightnessMap, charSet); // does phase 1-3
+        return fillFinalPicture(numCharsInRow, numCharsInCol, subImageAvg, charBrightnessMap);
     }
 
-    private void CalcCharBrightness(HashMap<Character, Double> charBrightnessMap, int subPictureSize,
-                                    Character[] chars) {
-        for(Character c: chars){
-            boolean [][] charset = CharRenderer.getImg(c, subPictureSize, fontName);
-            charBrightnessMap.put(c, countWhitesAndDiv(charset));
+    /**
+     * helper function to fill the final picture that will be returned
+     * @param numCharsInRow number of chars in a row
+     * @param numCharsInCol number of chars in column
+     * @param subImageAvg the Sub Image average brightness
+     * @param charBrightnessMap a map with the brightness of all chars
+     * @return the final char [][] array that will represent the picture in chars
+     */
+    private char[][] fillFinalPicture(int numCharsInRow, int numCharsInCol, double[][] subImageAvg,
+                                      HashMap<Character, Double> charBrightnessMap){
+        char [][] finalPicture = new char[numCharsInCol][numCharsInRow];
+        for (int i = 0; i < numCharsInCol; i++) {
+            for (int j = 0; j < numCharsInRow; j++) {
+                double bestDiff = 2, curDiff = 0;
+                for(Character key: charBrightnessMap.keySet()){
+                    curDiff = Math.abs(charBrightnessMap.get(key) - subImageAvg[i][j]);
+                    if(curDiff < bestDiff){
+                        bestDiff = curDiff;
+                        finalPicture[i][j] = key;
+                    }
+                }
+            }
         }
+        return finalPicture;
+    }
+
+    /**
+     * calculate the brightness of each character - if only one char than don't stretch it
+     * @param charBrightnessMap the map of character and their values
+     * @param chars the chars
+     */
+    private void CalcCharBrightness(HashMap<Character, Double> charBrightnessMap, Character[] chars) {
         double maxBright = 0;
         double minBright = 1;
-        for (double d: charBrightnessMap.values()){
-            if(d < minBright){
-                minBright = d;
+        for(Character c: chars){
+            charBrightnessMap.put(c, countWhitesAndDiv(CharRenderer.getImg(c, RES_NORMAL, fontName)));
+            if(charBrightnessMap.get(c) < minBright){
+                minBright = charBrightnessMap.get(c);
             }
-            if (d > maxBright){
-                maxBright = d;
+            if(charBrightnessMap.get(c) > maxBright){
+                maxBright = charBrightnessMap.get(c);
             }
         }
+        if(chars.length == 1){
+            return;
+        }
         for(Character key: charBrightnessMap.keySet()){
-            charBrightnessMap.put(key, newCharBrightness(charBrightnessMap.get(key),
-                    minBright, maxBright));
+            double p = newCharBrightness(charBrightnessMap.get(key),
+                    minBright, maxBright);
+            charBrightnessMap.put(key, p);
         }
     }
 
     /**
-     * calculates each sub image avg brightness and returns an array that holds these values
-     * @param subImageSize the width of a sub message
-     * @param numCharsInRow the number of columns
-     * @param numCharsInCol the number of rows
-     * @return 2d array of double
+     * This calls the image method to divide into sub images
+     * @param subImageSize the sub image size
+     * @param numCharsInRow the num of chars in a row
+     * @param numCharsInCol the num of chars in a column
+     * @return an array representing the average brightness of each sub image
      */
-    private double[][] getAvgForImage(int subImageSize, int numCharsInRow, int numCharsInCol) {
+    private double[][] getImageAvg(int subImageSize, int numCharsInRow, int numCharsInCol) {
         double [][] array = new double[numCharsInCol][numCharsInRow];
-        Iterator<Color> iter = image.pixels(subImageSize).iterator();
-        for (int i = 0; i < numCharsInCol; i++) {
-            for (int j = 0; j < numCharsInRow; j++) {
-                double sum = 0;
-                int count = 0; // Cant do more than size of subImageSize ^2
-                while (iter.hasNext()){
-                    Color pixel = iter.next();
-                    sum += getGrayValue(pixel);
-                    count++;
-                    if(count >= subImageSize * subImageSize){
-                        break;
-                    }
-                }
-                array[i][j] = sum / ((subImageSize * subImageSize) * MAX_RGB);
+        ArrayList<Image> arrayList = image.divToSubImages(subImageSize);
+        for (int k = 0; k < arrayList.size(); k++) {
+            double sum = 0;
+            for (Color color : arrayList.get(k).pixels()) {
+                sum += getGrayValue(color);
             }
+            array[k / numCharsInRow][k % numCharsInRow] =
+                    sum / ((subImageSize * subImageSize) * MAX_RGB);
         }
         return array;
     }
+
+//    /**
+//     * calculates each sub image avg brightness and returns an array that holds these values
+//     * @param subImageSize the width of a sub message
+//     * @param numCharsInRow the number of columns
+//     * @param numCharsInCol the number of rows
+//     * @return 2d array of double
+//     */
+//    private double[][] getAvgForImage(int subImageSize, int numCharsInRow, int numCharsInCol) {
+//        double [][] array = new double[numCharsInCol][numCharsInRow];
+//        Iterator<Color> iter = image.pixels(subImageSize).iterator();
+//        for (int i = 0; i < numCharsInCol; i++) {
+//            for (int j = 0; j < numCharsInRow; j++) {
+//                double sum = 0;
+//                int count = 0; // Cant do more than size of subImageSize ^2
+//                while (iter.hasNext()){
+//                    Color pixel = iter.next();
+//                    sum += getGrayValue(pixel);
+//                    count++;
+//                    if(count >= subImageSize * subImageSize){
+//                        break;
+//                    }
+//                }
+//                array[i][j] = sum / ((subImageSize * subImageSize) * MAX_RGB);
+//            }
+//        }
+//        return array;
+//    }
 
     /**
      * this does the first phase for each sub-image by counting how many white pixels are there
@@ -116,52 +161,27 @@ public class BrightnessImgCharMatcher {
      */
     private double countWhitesAndDiv(boolean[][] chars){
         double count_whites = 0;
-        for (int i = 0; i < chars.length; i++) {
-            for (int j = 0; j < chars[i].length; j++) {
-                if(chars[i][j]){
+        for (boolean[] aChar : chars) {
+            for (boolean b : aChar) {
+                if (b) {
                     count_whites += 1;
                 }
             }
         }
-        return count_whites / RES_NORMAL;
+        return count_whites / ( RES_NORMAL * RES_NORMAL);
     }
 
-//    /**
-//     * calculates the norm of whites according to 16 pixels
-//     * @param count_whites the num of white pixels
-//     * @return the norm
-//     */
-//    private double normWhites(double count_whites){
-//        return count_whites / RES_NORMAL;
-//    }
-
-    //TODO TODO: figure out how to get all the values
     /**
      * return new sub image brightness according to phase 3
-     * @param char_brightness
-     * @param min_brightness
-     * @param max_brightness
-     * @return
+     * @param char_brightness the char brightness
+     * @param min_brightness the least bright char
+     * @param max_brightness the most bright char
+     * @return the new brightness
      */
-    private double newCharBrightness(double char_brightness, double min_brightness, double max_brightness){
+    private double newCharBrightness(double char_brightness, double min_brightness,
+                                     double max_brightness){
         return (char_brightness - min_brightness) / (max_brightness - min_brightness);
     }
-
-
-//    /**
-//     * calculates the Avg brightness of a given subImage
-//     * @param subImage A 2D array of color representing a sub image
-//     * @return Avg brightness
-//     */
-//    private double subImageAvg(Color [][] subImage){
-//        double sum = 0;
-//        for (int i = 0; i < subImage.length; i++) {
-//            for (int j = 0; j < subImage[i].length; j++) {
-//                sum += getGrayValue(subImage[i][j]);
-//            }
-//        }
-//        return sum / ((subImage.length * subImage.length) * MAX_RGB);
-//    }
 
     /**
      * gets color and returns its gray value
