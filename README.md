@@ -1,6 +1,6 @@
 A java programn to create ASCII art easly.
 
-To use this you must run the Driver file with only the path of the image you wish to render.
+To use this you must run the Driver file with only the path of the image you wish to render. <br>
 Give the following input to perform the rendering: <br>
 add * : add chars to use in the rendering, * is replaced by a char or a range of chars i.e a-d or 8 <br>
 remove * : remove chars from the rendering, * is replaced by a char or a range of chars i.e a-d or 8 <br>
