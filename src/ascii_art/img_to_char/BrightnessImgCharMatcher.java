@@ -125,34 +125,6 @@ public class BrightnessImgCharMatcher {
         return array;
     }
 
-//    /**
-//     * calculates each sub image avg brightness and returns an array that holds these values
-//     * @param subImageSize the width of a sub message
-//     * @param numCharsInRow the number of columns
-//     * @param numCharsInCol the number of rows
-//     * @return 2d array of double
-//     */
-//    private double[][] getAvgForImage(int subImageSize, int numCharsInRow, int numCharsInCol) {
-//        double [][] array = new double[numCharsInCol][numCharsInRow];
-//        Iterator<Color> iter = image.pixels(subImageSize).iterator();
-//        for (int i = 0; i < numCharsInCol; i++) {
-//            for (int j = 0; j < numCharsInRow; j++) {
-//                double sum = 0;
-//                int count = 0; // Cant do more than size of subImageSize ^2
-//                while (iter.hasNext()){
-//                    Color pixel = iter.next();
-//                    sum += getGrayValue(pixel);
-//                    count++;
-//                    if(count >= subImageSize * subImageSize){
-//                        break;
-//                    }
-//                }
-//                array[i][j] = sum / ((subImageSize * subImageSize) * MAX_RGB);
-//            }
-//        }
-//        return array;
-//    }
-
     /**
      * this does the first phase for each sub-image by counting how many white pixels are there
      * and divides by 16 - the constant
